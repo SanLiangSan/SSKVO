@@ -8,10 +8,10 @@
 
 #import "NSObject+SSKVO.h"
 #import <objc/message.h>
-static NSString * const SSKVOPrefix = @"SSKVONotifying_";
-static NSString * const SSKVOAssiociateKey = @"SSKVOAssiociateKey";
-static NSString * const SSKVO_Old = @"SSKVO_Old";
-static NSString * const SSKVO_New = @"SSKVO_New";
+static NSString * const SSKVOPrefix             = @"SSKVONotifying_";
+static NSString * const SSKVOAssiociateKey      = @"SSKVOAssiociateKey";
+static NSString * const SSKVO_Old               = @"SSKVO_Old";
+static NSString * const SSKVO_New               = @"SSKVO_New";
 
 
 @interface SSKVOInfo : NSObject {
@@ -117,11 +117,13 @@ static NSString * const SSKVO_New = @"SSKVO_New";
     return kvoClass;
 }
 
+/** 重写set方法 */
 void ss_setter(id self, SEL _cmd, id value)
 {
     NSString *v = NSStringFromSelector(_cmd);
     NSString *key = getterForSetter(v);
     Class c = [self class];
+    /** 自动观察 */
     if ([c ss_automaticallyNotifiesObserversForKey:key]) {
         [self ss_willChangeValueForKey:key];
         ss_sendSuper(self, _cmd, value);
@@ -131,6 +133,7 @@ void ss_setter(id self, SEL _cmd, id value)
     }
 }
 
+/** 调用父类的set方法 */
 void ss_sendSuper(id self, SEL _cmd, id value)
 {
     void (*ss_msgSendSuper)(void *,SEL , id) = (void *)objc_msgSendSuper;
@@ -143,6 +146,7 @@ void ss_sendSuper(id self, SEL _cmd, id value)
     ss_msgSendSuper(&superStruct,_cmd,value);
 }
 
+/** 是否自动观察 */
 + (BOOL)ss_automaticallyNotifiesObserversForKey:(NSString *)key {
     return YES;
 }
