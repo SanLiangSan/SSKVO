@@ -168,8 +168,16 @@ void ss_sendSuper(id self, SEL _cmd, id value)
     // send notification
     if ([changeKey isEqualToString:SSKVO_New]) {
         id observer = kvoInfo->observer;
+        int options = kvoInfo->options;
+        NSMutableDictionary *info = [NSMutableDictionary dictionaryWithCapacity:2];
+        if (options & SSKeyValueObservingOptionNew) {
+            [info setObject:changes[SSKVO_New] forKey:SSKVO_New];
+        }
+        if (options & SSKeyValueObservingOptionOld) {
+            [info setObject:changes[SSKVO_Old] forKey:SSKVO_Old];
+        }
         if (observer && [observer respondsToSelector:@selector(ss_observeValueForKeyPath:ofObject:change:context:)]) {
-            [observer ss_observeValueForKeyPath:keyPath ofObject:self change:changes context:kvoInfo->context];
+            [observer ss_observeValueForKeyPath:keyPath ofObject:self change:info context:kvoInfo->context];
         }
     }
 }
