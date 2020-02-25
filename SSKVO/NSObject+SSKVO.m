@@ -124,13 +124,13 @@ void ss_setter(id self, SEL _cmd, id value)
     NSString *v = NSStringFromSelector(_cmd);
     NSString *key = getterForSetter(v);
     Class c = [self class];
-    /** 自动观察 */
+    /** 自动观察，我们自动调用ss_willChangeValueForKey 和  ss_didChangeValueForKey*/
     if ([c ss_automaticallyNotifiesObserversForKey:key]) {
         [self ss_willChangeValueForKey:key];
         /** 调用父类的set方法 */
         ss_sendSuper(self, _cmd, value);
         [self ss_didChangeValueForKey:key];
-    } else {
+    } else {// 只调用父类方法，如果父类自己实现will和did方法，也会发送通知
         ss_sendSuper(self, _cmd, value);
     }
 }
