@@ -94,6 +94,7 @@ static NSString * const SSKVO_New               = @"SSKVO_New";
 }
 
 #pragma mark - custom method
+// 动态生成子类
 - (Class)replacementClass {
     // 判断是否已经创建过动态子类
     NSString *className = NSStringFromClass(self.class);
@@ -126,6 +127,7 @@ void ss_setter(id self, SEL _cmd, id value)
     /** 自动观察 */
     if ([c ss_automaticallyNotifiesObserversForKey:key]) {
         [self ss_willChangeValueForKey:key];
+        /** 调用父类的set方法 */
         ss_sendSuper(self, _cmd, value);
         [self ss_didChangeValueForKey:key];
     } else {
@@ -146,18 +148,13 @@ void ss_sendSuper(id self, SEL _cmd, id value)
     ss_msgSendSuper(&superStruct,_cmd,value);
 }
 
-/** 是否自动观察 */
-+ (BOOL)ss_automaticallyNotifiesObserversForKey:(NSString *)key {
-    return YES;
-}
-
-
 - (void)ss_willChangeValueForKey:(NSString *)key {
     [self saveCurrentValueFor:SSKVO_Old keyPath:key];
 }
 
 - (void)ss_didChangeValueForKey:(NSString *)key {
     [self saveCurrentValueFor:SSKVO_New keyPath:key];
+    [self sendNotification:key];
 }
 
 - (void)saveCurrentValueFor:(NSString *)changeKey  keyPath:(NSString *)keyPath {
@@ -168,11 +165,18 @@ void ss_sendSuper(id self, SEL _cmd, id value)
     id value = [self valueForKey:keyPath]?[self valueForKey:keyPath]:@"";
     [changes setObject:value forKey:changeKey];
     kvoInfo->changes = changes.copy;
-    
+}
+
+- (void)sendNotification:(NSString *)keyPath {
+    id object = [self kvoInfoForKey:keyPath];
+    if (!object || ![object isKindOfClass:[SSKVOInfo class]]) {return;}
+    SSKVOInfo *kvoInfo = (SSKVOInfo *)object;
     // send notification
-    if ([changeKey isEqualToString:SSKVO_New]) {
-        id observer = kvoInfo->observer;
+    id observer = kvoInfo->observer;
+    // 发送通知
+    if (observer && [observer respondsToSelector:@selector(ss_observeValueForKeyPath:ofObject:change:context:)]) {
         int options = kvoInfo->options;
+        NSDictionary *changes = kvoInfo->changes;
         NSMutableDictionary *info = [NSMutableDictionary dictionaryWithCapacity:2];
         if (options & SSKeyValueObservingOptionNew) {
             [info setObject:changes[SSKVO_New] forKey:SSKVO_New];
@@ -180,11 +184,15 @@ void ss_sendSuper(id self, SEL _cmd, id value)
         if (options & SSKeyValueObservingOptionOld) {
             [info setObject:changes[SSKVO_Old] forKey:SSKVO_Old];
         }
-        if (observer && [observer respondsToSelector:@selector(ss_observeValueForKeyPath:ofObject:change:context:)]) {
-            [observer ss_observeValueForKeyPath:keyPath ofObject:self change:info context:kvoInfo->context];
-        }
+        [observer ss_observeValueForKeyPath:keyPath ofObject:self change:info context:kvoInfo->context];
     }
 }
+
+/** 是否自动观察 */
++ (BOOL)ss_automaticallyNotifiesObserversForKey:(NSString *)key {
+    return YES;
+}
+
 
 static NSString *getterForSetter(NSString *setter){
     if (setter.length <= 0 || ![setter hasPrefix:@"set"] || ![setter hasSuffix:@":"]) { return nil;}
@@ -195,12 +203,9 @@ static NSString *getterForSetter(NSString *setter){
 }
 
 static NSString *setterForGetter(NSString *getter){
-    
     if (getter.length <= 0) { return nil;}
-    
     NSString *firstString = [[getter substringToIndex:1] uppercaseString];
     NSString *leaveString = [getter substringFromIndex:1];
-    
     return [NSString stringWithFormat:@"set%@%@:",firstString,leaveString];
 }
 
